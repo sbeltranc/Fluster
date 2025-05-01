@@ -21,9 +21,9 @@ async fn main() {
                 //r#static::embedded_images, r#static::embedded_js, r#static::embedded_css,
             ])
 
-            .mount("/images", rocket::fs::FileServer::from("src/assets/images"))
             .mount("/JS", rocket::fs::FileServer::from("src/assets/js"))
             .mount("/CSS", rocket::fs::FileServer::from("src/assets/css"))
+            .mount("/images", rocket::fs::FileServer::from("src/assets/images"))
             
             .launch()
             .await;

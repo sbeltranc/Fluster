@@ -18,7 +18,6 @@ local function connectedTo(url, replicator)
 	end
 
 	local success, err = pcall(function()
-		game:SetMessageBrickCount()
 		marker = replicator:SendMarker()
 	end)
 
@@ -28,13 +27,6 @@ local function connectedTo(url, replicator)
 
 	if not marker then
 		showErrorMessage("Failed to connect to the server.")
-	end
-
-	marker.Recieved:connect(onRecievedMarker)
-
-	while not recieved do
-		game.Workspace:ZoomToExtents()
-		wait(0.5)
 	end
 
 	pcall(function() game:ClearMessage() end)
@@ -60,6 +52,7 @@ local success_connect, error_connect = pcall(function()
 		showErrorMessage("Connection failed: " .. tostring(errcode) .. " - " .. tostring(why))
 	end)
 
+	player = game:GetService("Players"):CreateLocalPlayer(0)
 	client:connect("localhost", 53640, 0)
 end)
 

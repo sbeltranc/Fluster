@@ -6,6 +6,24 @@ use dirs::data_local_dir;
 #[tauri::command]
 fn get_device_username() -> String {
     let username = std::env::var("USER").unwrap_or_else(|_| "Unknown".to_string());
+
+    if username == "Unknown" && cfg!(target_os = "windows") {
+        extern "C" {
+            fn GetUserNameA(lpbuffer: *mut u8, nsize: *mut u32) -> i32;
+        }
+
+        let mut buffer: [u8; 256] = [0; 256];
+        let mut size: u32 = buffer.len() as u32;
+
+        let result = unsafe { GetUserNameA(buffer.as_mut_ptr(), &mut size) };
+
+        if result == 0 {
+            return "Unknown".to_string();
+        }
+
+        return String::from_utf8_lossy(&buffer[..size as usize - 1]).to_string();
+    }
+    
     return username;
 }
 

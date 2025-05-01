@@ -7,33 +7,27 @@ local sleepTime = 10
 
 local ns = game:service("NetworkServer")
 
-function waitForChild(parent, childName)
-	while true do
-		local child = parent:findFirstChild(childName)
-		if child then
-			return child
-		end
-		parent.ChildAdded:wait()
-	end
-end
-
-function characterRessurection(player)
-	if player.Character then
-		local humanoid = player.Character.Humanoid
-		humanoid.Died:connect(function() wait(5) player:LoadCharacter() end)
-    else
-        player:LoadCharacter()
-	end
-end
-
 game:service("Players").PlayerAdded:connect(function(player)
-	characterRessurection(player)
+    player:LoadCharacter(true)
 
-	player.Changed:connect(function(name)
-		if name=="Character" then
-			characterRessurection(player)
-		end
-	end)
+	while wait() do
+        if player.Character then
+            local humanoid = player.Character.Humanoid
+
+            if humanoid then
+                if humanoid.Health == 0 then
+                    wait(5)
+                    player:LoadCharacter(true)
+                end
+            else
+                wait(5)
+                player:LoadCharacter(true)
+            end
+        else
+            wait(5)
+            player:LoadCharacter(true)
+        end
+    end
 end)
 
 pcall(function() game:GetService("NetworkServer"):SetIsPlayerAuthenticationRequired(false) end)
