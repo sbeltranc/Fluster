@@ -49,7 +49,6 @@ end
 game.Players.PlayerAdded:connect(onPlayerAdded)
 
 -- starting the solo server
-NetworkServer:Start(1000, 20)
 RunService:Run()
 
 -- creating a new player
