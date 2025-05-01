@@ -10,7 +10,7 @@ function onPlayerAdded(player)
     -- new player joined, handle characteradded logic    
     player:LoadCharacter(true)
 
-    game.Workspace.CurrentCamera.CameraType = 2
+    game.Workspace.CurrentCamera.CameraType = 3
     game.Workspace.CurrentCamera.CameraSubject = player.Character
 
     while wait() do
@@ -24,7 +24,7 @@ function onPlayerAdded(player)
                     wait(5)
                     player:LoadCharacter(true)
 
-                    game.Workspace.CurrentCamera.CameraType = 2
+                    game.Workspace.CurrentCamera.CameraType = 3
                     game.Workspace.CurrentCamera.CameraSubject = player.Character
                 end
             else
@@ -32,7 +32,7 @@ function onPlayerAdded(player)
                 wait(5)
                 player:LoadCharacter(true)
 
-                game.Workspace.CurrentCamera.CameraType = 2
+                game.Workspace.CurrentCamera.CameraType = 3
                 game.Workspace.CurrentCamera.CameraSubject = player.Character
             end
         else
@@ -40,7 +40,7 @@ function onPlayerAdded(player)
             wait(5)
             player:LoadCharacter(true)
 
-            game.Workspace.CurrentCamera.CameraType = 2
+            game.Workspace.CurrentCamera.CameraType = 3
             game.Workspace.CurrentCamera.CameraSubject = player.Character
         end
     end
