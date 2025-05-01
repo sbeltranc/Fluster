@@ -1,7 +1,36 @@
-use std::{fs::{self, File}, io::{copy, Write}};
+use std::ffi::OsStr;
+use std::fs::{self, File};
+use std::io::{Write, Read, copy};
 
 use zip::ZipArchive;
 use dirs::data_local_dir;
+
+const HOSTS_ENTRIES: &str = "\
+# Fluster Local Domain Entries
+127.0.0.1 fluster.is
+127.0.0.1 www.fluster.is
+";
+
+fn write_hosts_file() -> Result<String, String> {
+    let hosts_path = match std::env::consts::OS {
+        "windows" => r"C:\Windows\System32\drivers\etc\hosts",
+        _ => "/etc/hosts",
+    };
+
+    if !std::path::Path::new(hosts_path).exists() {
+        return Err(format!("Hosts file not found at {}", hosts_path));
+    }
+
+    let mut file = std::fs::OpenOptions::new()
+        .append(true)
+        .open(hosts_path)
+        .map_err(|e| format!("Failed to open hosts file: {}", e))?;
+
+    file.write_all(HOSTS_ENTRIES.as_bytes())
+        .map_err(|e| format!("Failed to write to hosts file: {}", e))?;
+
+    Ok("Hosts file updated successfully".to_string())
+}
 
 #[tauri::command]
 fn get_device_username() -> String {
@@ -61,10 +90,7 @@ async fn launch_client(version: String) -> bool {
         return false;
     }
 
-    // launch the executable on windows
-    let mut command = std::process::Command::new(client);
-
-    command
+    std::process::Command::new(client)
         .spawn()
         .expect("Failed to launch the client");
 
@@ -95,8 +121,8 @@ fn fluster_setup() -> bool {
 
     if fluster_path.exists() == false && fluster_path.is_dir() == false {
         std::fs::create_dir_all(&fluster_path).expect("Failed to create Fluster directory");
-        std::fs::create_dir_all(&versions_path).expect("Failed to create versions directory");
-        std::fs::create_dir_all(&downloads_path).expect("Failed to create downloads directory");
+        std::fs::create_dir_all(&versions_path).expect("Failed to create Fluster/versions directory");
+        std::fs::create_dir_all(&downloads_path).expect("Failed to create Fluster/downloads directory");
 
         return true;
     }
@@ -177,6 +203,68 @@ async fn install_client(version: &str) -> Result<String, String> {
 }
 
 #[tauri::command]
+async fn setup_hosts_file() -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::ffi::OsStrExt;
+        use winapi::um::{ shellapi::ShellExecuteW, winuser::SW_HIDE };
+
+        // lets read before hand if the hosts file is already set up
+        let hosts_path = match std::env::consts::OS {
+            "windows" => r"C:\Windows\System32\drivers\etc\hosts",
+            _ => "/etc/hosts",
+        };
+
+        if !std::path::Path::new(hosts_path).exists() {
+            return Err(format!("Hosts file not found at {}", hosts_path));
+        }
+
+        let mut file = std::fs::OpenOptions::new()
+            .read(true)
+            .open(hosts_path)
+            .map_err(|e| format!("Failed to open hosts file: {}", e))?;
+
+        if file.metadata().is_ok() {
+            let mut contents = String::new();
+            
+            file.read_to_string(&mut contents)
+                .map_err(|e| format!("Failed to read hosts file: {}", e))?;
+
+            if contents.contains(HOSTS_ENTRIES) {
+                return Ok("Hosts file already contains Fluster entries".to_string());
+            }
+        }
+
+        // ok nvm it doesn't exist.. let's add them
+        fn to_wide(s: &str) -> Vec<u16> {
+            OsStr::new(s).encode_wide().chain(Some(0)).collect()
+        }
+
+        let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        let exe_w = to_wide(&exe.to_string_lossy());
+        let verb = to_wide("runas");
+        let args = to_wide("--write-hosts");
+
+        let result = unsafe {
+            ShellExecuteW(
+                std::ptr::null_mut(),
+                verb.as_ptr(),
+                exe_w.as_ptr(),
+                args.as_ptr(),
+                std::ptr::null(),
+                SW_HIDE,
+            )
+        };
+
+        if (result as isize) <= 32 {
+            Err("We couldn't add the local Fluster Domains onto your machine, did you accept the UAC prompt?".into())
+        } else {
+            Ok("Setup the local Fluster Domains onto the machine!".into())
+        }
+    }
+}
+
+#[tauri::command]
 async fn uninstall_client(version: &str) -> Result<String, String> {
     let data = match data_local_dir() {
         Some(path) => path,
@@ -197,6 +285,17 @@ async fn uninstall_client(version: &str) -> Result<String, String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // UGLY HACK: editing the hosts file requires admin perms
+    // so scratching my head for ideas, i just straight up decided to
+    // create a new process with elevated permissions to do it for me with some args n thats it
+
+    if std::env::args().any(|arg| arg == "--write-hosts") {
+        match write_hosts_file() {
+            Ok(_) => std::process::exit(0),
+            Err(_) => std::process::exit(1),
+        }
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         
@@ -204,6 +303,8 @@ pub fn run() {
             get_device_username,
         
             fluster_setup,
+            setup_hosts_file,
+            
             is_fluster_setup,
             is_version_installed,
 

@@ -149,9 +149,24 @@ export default function App() {
   }
 
   const handleStartSetup = async () => {
-    await invoke("fluster_setup")
-    setHideInstalledInAvailable(false)
-    setCurrentView("setup")
+    try {
+      await invoke("setup_hosts_file");
+      await invoke("fluster_setup")
+        
+      setHideInstalledInAvailable(false)
+      setCurrentView("setup")
+    } catch (error) {
+      toast("Failed to setup", {
+        description: `${error}`,
+        duration: 5000,
+        action: {
+          label: "Retry",
+          onClick: () => handleStartSetup(),
+        },
+      })
+
+      console.error("Failed to setup Fluster dependencies:", error)
+    }
   }
 
   const handleGoToDashboard = () => {
@@ -255,7 +270,6 @@ export default function App() {
               installingVersions={installingVersions}
               installedVersions={installedVersions}
               isInstalling={isInstalling}
-              installationComplete={installationComplete}
               onInstall={handleInstall}
               onUninstall={handleUninstall}
               onGoToDashboard={handleGoToDashboard}
