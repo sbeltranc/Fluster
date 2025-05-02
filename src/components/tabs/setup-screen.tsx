@@ -44,7 +44,6 @@ function VersionItem({ version, onClick, isInstalled, disabled = false }: Versio
 }
 
 interface SetupScreenProps {
-  versions: VersionData[]
   availableVersions: VersionData[]
   installingVersions: VersionData[]
   installedVersions: VersionData[]
@@ -55,7 +54,6 @@ interface SetupScreenProps {
 }
 
 export default function SetupScreen({
-  versions,
   availableVersions,
   installingVersions,
   installedVersions,

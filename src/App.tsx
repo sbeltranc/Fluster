@@ -65,7 +65,6 @@ export default function App() {
   const [username, setUsername] = useState<string>("")
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [isInstalling, setIsInstalling] = useState(false)
-  const [installationComplete, setInstallationComplete] = useState(false)
   const [currentView, setCurrentView] = useState<"welcome" | "setup" | "dashboard">("welcome")
   const [hideInstalledInAvailable, setHideInstalledInAvailable] = useState(false)
 
@@ -143,7 +142,6 @@ export default function App() {
   }
 
   const handleGetMoreClients = () => {
-    setInstallationComplete(false)
     setHideInstalledInAvailable(true)
     setCurrentView("setup")
   }
@@ -265,7 +263,6 @@ export default function App() {
         {currentView === "setup" && (
           <div className="relative z-10 w-full h-full">
             <SetupScreen
-              versions={versions}
               availableVersions={availableVersions}
               installingVersions={installingVersions}
               installedVersions={installedVersions}
