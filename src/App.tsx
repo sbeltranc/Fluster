@@ -12,16 +12,7 @@ import MenuBar from "./components/tabs/menu-bar"
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
-interface VersionData {
-  id: string
-  name: string
-  size: string
-  installed: boolean
-  installing: boolean
-  progress: number
-  lastPlayed?: string
-  playTime?: string
-}
+import VersionData from "./interfaces/VersionData";
 
 const dataService = {
   getAvailableVersions: async (): Promise<VersionData[]> => {
@@ -30,9 +21,10 @@ const dataService = {
         id: "version-997deaae24a8",
         name: "Roblox Client 2008",
         size: "placeholder",
+
         installed: await dataService.versionInstalled("version-997deaae24a8"),
         installing: false,
-        progress: 0,
+
         lastPlayed: "placeholder",
         playTime: "placeholder",
       }
@@ -173,22 +165,12 @@ export default function App() {
 
   const handleLaunch = async (id: string) => {
     try {
-      if (await dataService.launchVersion(id) == false) {
-        toast("Failed to launch client", {
-          description: "Something went wrong while launching the client. Please try re-installing it.",
-          duration: 3000,
-          action: {
-            label: "Retry",
-            onClick: () => handleLaunch(id),
-          },
-        });
+      const launched = await dataService.launchVersion(id);
 
-        return
-      }
-      await dataService.launchVersion(id)
+
     } catch (error) {
       toast("An error occurred", {
-        description: "An internal error occurred while launching the client. Please try again.",
+        description: `${error}`,
         duration: 5000,
         action: {
           label: "Retry",
@@ -230,7 +212,7 @@ export default function App() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-black">
-        <div className="relative h-[450px] w-[800px] flex items-center justify-center overflow-hidden bg-black rounded-lg shadow-2xl">
+        <div className="relative h-[450px] w-[800px] flex items-center justify-center overflow-hidden bg-black shadow-2xl">
           <BackgroundPaths />
           <MenuBar onMinimize={handleMinimize} onClose={handleClose} />
           <div className="relative z-10 text-white">Loading...</div>
@@ -241,7 +223,7 @@ export default function App() {
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-black">
-      <div className="relative h-[450px] w-[800px] flex items-center justify-center overflow-hidden bg-black rounded-lg shadow-2xl">
+      <div className="relative h-[450px] w-[800px] flex items-center justify-center overflow-hidden bg-black shadow-2xl">
         <BackgroundPaths />
 
         <MenuBar onMinimize={handleMinimize} onClose={handleClose} />

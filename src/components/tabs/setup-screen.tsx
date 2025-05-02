@@ -3,23 +3,8 @@
 import { Button } from "@/components/ui/button"
 import { ArrowRight, Download, X } from "lucide-react"
 
-interface VersionData {
-  id: string
-  name: string
-  size: string
-  installed: boolean
-  installing: boolean
-  progress: number
-  lastPlayed?: string
-  playTime?: string
-}
-
-interface VersionItemProps {
-  version: VersionData
-  onClick: () => void
-  isInstalled: boolean
-  disabled?: boolean
-}
+import SetupScreenProps from "@/interfaces/SetupScreenProps"
+import VersionItemProps from "@/interfaces/VersionItemProps"
 
 function VersionItem({ version, onClick, isInstalled, disabled = false }: VersionItemProps) {
   return (
@@ -41,16 +26,6 @@ function VersionItem({ version, onClick, isInstalled, disabled = false }: Versio
       )}
     </div>
   )
-}
-
-interface SetupScreenProps {
-  availableVersions: VersionData[]
-  installingVersions: VersionData[]
-  installedVersions: VersionData[]
-  isInstalling: boolean
-  onInstall: (id: string) => void
-  onUninstall: (id: string) => void
-  onGoToDashboard: () => void
 }
 
 export default function SetupScreen({

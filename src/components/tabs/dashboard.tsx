@@ -4,21 +4,8 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Play, Settings, Clock, BarChart, Download, Search } from "lucide-react"
 
-interface VersionData {
-  id: string
-  name: string
-  size: string
-  installed: boolean
-  installing: boolean
-  progress: number
-  lastPlayed?: string
-  playTime?: string
-}
-
-interface ClientCardProps {
-  version: VersionData
-  onLaunch: (id: string) => void
-}
+import DashboardProps from "@/interfaces/DashboardProps"
+import ClientCardProps from "@/interfaces/ClientCardProps"
 
 function ClientCard({ version, onLaunch }: ClientCardProps) {
   return (
@@ -56,13 +43,6 @@ function ClientCard({ version, onLaunch }: ClientCardProps) {
       </div>
     </div>
   )
-}
-
-interface DashboardProps {
-  versions: VersionData[]
-  onGetMoreClients: () => void
-  onLaunch: (id: string) => void
-  username: string
 }
 
 export default function Dashboard({ versions, onGetMoreClients, onLaunch, username }: DashboardProps) {
@@ -110,8 +90,8 @@ export default function Dashboard({ versions, onGetMoreClients, onLaunch, userna
               className="bg-black border-white/30 text-white hover:bg-white/10 hover:border-white/50 rounded-md"
               onClick={onGetMoreClients}
             >
-              <Download size={14} className="mr-2" />
-              Get More Clients
+              <Download size={14} />
+              Install Clients
             </Button>
           </div>
 
@@ -152,7 +132,7 @@ export default function Dashboard({ versions, onGetMoreClients, onLaunch, userna
                   onClick={onGetMoreClients}
                 >
                   <Download size={14} className="mr-2" />
-                  Get More Clients
+                  Install a Client
                 </Button>
               </>
             )}

@@ -1,11 +1,23 @@
-// just fyi: all this goes static, so there isn't any need to worry about all of this
-
 const UNSUPPORTED_TEMPLATE: &str = include_str!("../assets/Unfinished.html");
 
 #[rocket::get("/IDE/Start.aspx")]
 pub fn start() -> rocket::response::content::RawHtml<&'static str> {
     rocket::response::content::RawHtml(
         include_str!("../assets/Landing.html")
+    )
+}
+
+#[rocket::get("/Error/ReportDialog.aspx")]
+pub async fn error_report_dialog() -> rocket::response::content::RawHtml<&'static str> {
+    rocket::response::content::RawHtml(
+        include_str!("../assets/AnnoyingDialog.html")
+    )
+}
+
+#[rocket::get("/IDE/ClientToolbox.aspx")]
+pub fn toolbox() -> rocket::response::content::RawHtml<&'static str> {
+    rocket::response::content::RawHtml(
+        include_str!("../assets/Toolbox.html")
     )
 }
 
@@ -32,13 +44,6 @@ pub fn save() -> rocket::response::content::RawHtml<&'static str> {
 
 #[rocket::get("/AbuseReport/InGameChat.aspx")]
 pub fn abuse_report() -> rocket::response::content::RawHtml<&'static str> {
-    rocket::response::content::RawHtml(
-        UNSUPPORTED_TEMPLATE
-    )
-}
-
-#[rocket::get("/IDE/ClientToolbox.aspx")]
-pub fn toolbox() -> rocket::response::content::RawHtml<&'static str> {
     rocket::response::content::RawHtml(
         UNSUPPORTED_TEMPLATE
     )

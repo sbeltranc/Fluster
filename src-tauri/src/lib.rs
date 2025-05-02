@@ -3,7 +3,8 @@ use std::fs::{self, File};
 use std::io::{Write, Read, copy};
 
 use zip::ZipArchive;
-use dirs::data_local_dir;
+
+mod utils;
 
 const HOSTS_ENTRIES: &str = "\
 # Fluster Local Domain Entries
@@ -58,101 +59,59 @@ fn get_device_username() -> String {
 
 #[tauri::command]
 fn is_version_installed(version: &str) -> bool {
-    let data = match data_local_dir() {
-        Some(path) => path,
-        None => return false,
-    };
-
-    let client_folder = data.join("Fluster").join("versions").join(version);
-    let client_folder_path = std::path::Path::new(&client_folder);
-    
-    if client_folder_path.exists() == false {
-        return false;
-    }
-
-    let client = client_folder_path.join("Roblox.exe");
-    let client_path = std::path::Path::new(&client);
-
-    return client_folder_path.exists() && client_path.exists() && client_path.is_file() && client_folder_path.is_dir();
+    return utils::client::is_client_installed(version);
 }
 
 #[tauri::command]
-async fn launch_client(version: String) -> bool {
-    let data = match data_local_dir() {
-        Some(path) => path,
-        None => return false,
-    };
-
-    let whats_path = data.join("Fluster").join("versions").join(version).join("Roblox.exe");
-    let client = std::path::Path::new(&whats_path);
-
-    if client.exists() == false {
-        return false;
-    }
-
-    std::process::Command::new(client)
-        .spawn()
-        .expect("Failed to launch the client");
-
-    return true;
+async fn launch_client(version: &str) -> Result<bool, String> {
+    return utils::client::launch_client(version);
 }
 
 #[tauri::command]
 fn is_fluster_setup() -> bool {
-    let data = match data_local_dir() {
-        Some(path) => path,
-        None => return false,
-    };
-
-    let fluster_path = data.join("Fluster");
-    return fluster_path.exists() && fluster_path.is_dir();
+    return utils::appdata::is_fluster_setup();
 }
 
 #[tauri::command]   
-fn fluster_setup() -> bool {
-    let data = match data_local_dir() {
-        Some(path) => path,
-        None => return false,
-    };
+fn fluster_setup() -> Result<bool, String> {
+    utils::appdata::return_versions()
+        .ok();
 
-    let fluster_path = data.join("Fluster");
-    let versions_path = fluster_path.join("versions");
-    let downloads_path = fluster_path.join("downloads");
+    utils::appdata::return_downloads()
+        .ok();
 
-    if fluster_path.exists() == false && fluster_path.is_dir() == false {
-        std::fs::create_dir_all(&fluster_path).expect("Failed to create Fluster directory");
-        std::fs::create_dir_all(&versions_path).expect("Failed to create Fluster/versions directory");
-        std::fs::create_dir_all(&downloads_path).expect("Failed to create Fluster/downloads directory");
+    utils::appdata::return_cache()
+        .ok();
 
-        return true;
-    }
-
-    return false;
+    return Ok(true);
 }
 
 #[tauri::command]
 async fn install_client(version: &str) -> Result<String, String> {
-    let data = match data_local_dir() {
-        Some(path) => path,
-        None => return Err("Failed to get data local directory".to_string()),
+    let versions = match utils::appdata::return_versions() {
+        Ok(path) => path,
+        Err(e) => return Err(format!("Failed to get the versions directory: {}", e)),
     };
 
-    let version_path = data.join("Fluster").join("versions").join(version);
-    let downloads_dir = data.join("Fluster").join("downloads");
+    let downloads = match utils::appdata::return_downloads() {
+        Ok(path) => path,
+        Err(e) => return Err(format!("Failed to get the downloads directory: {}", e)),
+    };
 
-    fs::create_dir_all(&downloads_dir)
-        .map_err(|e| format!("Creating the Fluster Downloads directory failed: {}", e))?;
-
+    if utils::client::is_client_installed(version) {
+        return Ok(format!("{} is already installed", version));
+    }
 
     let url = format!("https://cdn.simuldev.com/{}.zip", version);
-    let dest_zip = downloads_dir.join(format!("{}", version));
+    let dest_zip = downloads.join(version);
     
     let response = reqwest::get(&url)
         .await
-        .map_err(|e| format!("Failed to contact with Fluster Storage servers: {}", e))?;
+        .map_err(|e| format!("Failed to contact with the Fluster Storage: {}", e))?;
+
 
     if response.status() == reqwest::StatusCode::NOT_FOUND {
-        return Err(format!("{} was not available on our servers", version));
+        return Err(format!("{} was not available on the Fluster Storage", version));
     }
 
     if response.status() != reqwest::StatusCode::OK || response.content_length().is_none() {
@@ -168,7 +127,7 @@ async fn install_client(version: &str) -> Result<String, String> {
         .write_all(&content)
         .map_err(|e| format!("Failed to write the verison data to the file: {}", e))?;
 
-    let file = File::open(downloads_dir.join(format!("{}", version)))
+    let file = File::open(downloads.join(version))
         .map_err(|e| format!("Failed to open the zip file: {}", e))?;
 
     let mut archive = ZipArchive::new(file)
@@ -179,7 +138,7 @@ async fn install_client(version: &str) -> Result<String, String> {
             .by_index(i)
             .map_err(|e| format!("Failed to read the zip entry: {}", e))?;
 
-        let out_path = version_path.join(entry.name().to_string());
+        let out_path = versions.join(entry.name().to_string());
 
         if entry.is_dir() {
             fs::create_dir_all(&out_path)
@@ -265,16 +224,16 @@ async fn setup_hosts_file() -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn uninstall_client(version: &str) -> Result<String, String> {
-    let data = match data_local_dir() {
-        Some(path) => path,
-        None => return Err("Failed to get data local directory".to_string()),
+async fn uninstall_client(version: &str) -> Result<String, String> {    
+    let versions = match utils::appdata::return_versions() {
+        Ok(path) => path,
+        Err(e) => return Err(format!("Failed to get the versions directory: {}", e)),
     };
 
-    let version_path = data.join("Fluster").join("versions").join(version);
+    let version_path = versions.join(version);
 
-    if version_path.exists() == false {
-        return Err(format!("{} is not installed", version));
+    if utils::client::is_client_installed(version) == false {
+        return Ok(format!("{} is not installed", version));
     }
 
     fs::remove_dir_all(&version_path)
