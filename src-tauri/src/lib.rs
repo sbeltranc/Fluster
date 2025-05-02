@@ -5,6 +5,9 @@ use std::io::{Write, Read, copy};
 use zip::ZipArchive;
 
 mod utils;
+mod routes;
+
+use routes::*;
 
 const HOSTS_ENTRIES: &str = "\
 # Fluster Local Domain Entries
@@ -254,6 +257,26 @@ pub fn run() {
             Err(_) => std::process::exit(1),
         }
     }
+
+    tokio::spawn(async {
+        let _ = rocket::build()
+            .mount("/", rocket::routes![
+                // IDE Pages
+                ide::toolbox, ide::start, ide::upload, ide::save, ide::abuse_report, ide::help, ide::error_report_dialog,
+
+                // Game APIs
+                game::gameserver, game::machine_configuration, game::keep_alive_pinger, game::visit, game::join,
+
+                // Asset APIs
+                asset::legacy, asset::v1, asset::v2,
+
+                // Embedding the static assets
+                r#static::embedded,
+            ])
+            
+            .launch()
+            .await;
+    });
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())

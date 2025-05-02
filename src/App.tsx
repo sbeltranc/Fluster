@@ -165,9 +165,7 @@ export default function App() {
 
   const handleLaunch = async (id: string) => {
     try {
-      const launched = await dataService.launchVersion(id);
-
-
+      await dataService.launchVersion(id);
     } catch (error) {
       toast("An error occurred", {
         description: `${error}`,
@@ -186,7 +184,7 @@ export default function App() {
     try {
       await getCurrentWindow().minimize()
     } catch (e) {
-      console.log("failed to minimize the window for whatever reason", e)
+      console.error("failed to minimize the window for whatever reason", e)
     }
   }, [])
 
@@ -194,7 +192,7 @@ export default function App() {
     try {
       await getCurrentWindow().close()
     } catch (e) {
-      console.log("failed to close the window for whatever reason", e)
+      console.error("failed to close the window for whatever reason", e)
     }
   }, [])
 
