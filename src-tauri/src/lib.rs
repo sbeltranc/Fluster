@@ -1,8 +1,8 @@
-use std::ffi::OsStr;
 use std::fs::{self, File};
-use std::io::{Write, Read, copy};
+use std::io::{Write, copy};
 
 use zip::ZipArchive;
+use tauri::{ AppHandle, Emitter };
 
 mod utils;
 mod routes;
@@ -37,6 +37,98 @@ fn write_hosts_file() -> Result<String, String> {
 }
 
 #[tauri::command]
+fn start_listening(app: AppHandle) -> Result<(), String> {
+    let client_result = utils::network::lan_discovery::start_discovery()
+        .map_err(|e| format!("Failed to start the discovery: {}", e));
+
+    std::thread::spawn(move || {
+        if let Ok(client) = client_result {
+            while let Ok(addr) = client.receiver.recv() {
+                app.emit("discovery", addr.to_string())
+                    .unwrap_or_else(|e| eprintln!("Failed to emit discovery event: {}", e));
+            }
+        } else {
+            eprintln!("Failed to start the discovery");
+        }
+    });
+
+    Ok(())
+}
+
+#[tauri::command]
+fn start_server(version: &str, file_path: &str) -> Result<(), String> {
+    let port = rand::random::<u16>() % 65535 + 1;
+
+    let data = match utils::appdata::return_versions() {
+        Ok(path) => path,
+        Err(_) => return Err("Failed to get the versions directory.".to_string()),
+    };
+
+    if !utils::client::is_client_installed(version) {
+        return Err("Client is not installed.".to_string());
+    }
+
+    let game_file_path = std::path::Path::new(file_path);
+
+    if !game_file_path.exists() || !game_file_path.is_file() {
+        return Err("Game file does not exist.".to_string());
+    }
+
+    let server_discovery_message = utils::network::lan_discovery::start_server(port)
+        .map_err(|e| format!("Failed to start the server: {}", e))?;
+
+    let mut server_launch = std::process::Command::new(data.join(version).join("Roblox.exe"))
+        .arg(file_path)
+
+        .arg("-no3d")
+
+        .arg("-script")
+        .arg(format!("loadfile('http://www.fluster.is/game/gameserver.ashx')(0, {})", port.to_string())) 
+
+        .spawn()
+        .map_err(|_| "Failed to launch the server.".to_string())?;
+
+
+    std::thread::spawn(move || {
+        let _ = server_launch.wait();
+        server_discovery_message.stop();
+    });
+
+    Ok(())
+}
+
+#[tauri::command]
+fn launch_server_connection(
+    version: &str,
+
+    server_ip: &str,
+    server_port: u16,
+
+    user_id: usize,
+) -> Result<bool, String> {
+    let data = match utils::appdata::return_versions() {
+        Ok(path) => path,
+        Err(_) => return Err("Failed to get the versions directory.".to_string()),
+    };
+
+    if !utils::client::is_client_installed(version) {
+        return Err("Client is not installed.".to_string());
+    }
+
+    let client_path = data.join(version).join("Roblox.exe");
+
+    let _ = std::process::Command::new(client_path)
+        .arg("-script")
+        .arg(format!(
+            "http://www.fluster.is/game/join.ashx?UserID={}&serverPort={}&serverIP={}",
+            user_id, server_port, server_ip
+        ))
+        .spawn();
+
+    Ok(true)
+}
+
+#[tauri::command]
 fn get_device_username() -> String {
     let username = std::env::var("USER").unwrap_or_else(|_| "Unknown".to_string());
 
@@ -66,7 +158,7 @@ fn is_version_installed(version: &str) -> bool {
 }
 
 #[tauri::command]
-async fn launch_client(version: &str) -> Result<bool, String> {
+fn launch_client(version: &str) -> Result<bool, String> {
     return utils::client::launch_client(version);
 }
 
@@ -141,7 +233,7 @@ async fn install_client(version: &str) -> Result<String, String> {
             .by_index(i)
             .map_err(|e| format!("Failed to read the zip entry: {}", e))?;
 
-        let out_path = versions.join(entry.name().to_string());
+        let out_path = versions.join(version).join(entry.name());
 
         if entry.is_dir() {
             fs::create_dir_all(&out_path)
@@ -165,7 +257,7 @@ async fn install_client(version: &str) -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn setup_hosts_file() -> Result<String, String> {
+fn setup_hosts_file() -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::ffi::OsStrExt;
@@ -224,10 +316,17 @@ async fn setup_hosts_file() -> Result<String, String> {
             Ok("Setup the local Fluster Domains onto the machine!".into())
         }
     }
+    #[cfg(not(target_os = "windows"))]
+    {
+        match write_hosts_file() {
+            Ok(message) => Ok(message),
+            Err(e) => Err(e),
+        }
+    }
 }
 
 #[tauri::command]
-async fn uninstall_client(version: &str) -> Result<String, String> {    
+fn uninstall_client(version: &str) -> Result<String, String> {    
     let versions = match utils::appdata::return_versions() {
         Ok(path) => path,
         Err(e) => return Err(format!("Failed to get the versions directory: {}", e)),
@@ -282,6 +381,9 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         
         .invoke_handler(tauri::generate_handler![
+            start_server,
+            start_listening,
+
             get_device_username,
         
             fluster_setup,
@@ -291,6 +393,8 @@ pub fn run() {
             is_version_installed,
 
             launch_client,
+            launch_server_connection,
+
             install_client,
             uninstall_client,
         ])

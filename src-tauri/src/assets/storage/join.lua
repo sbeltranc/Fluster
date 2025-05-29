@@ -52,8 +52,8 @@ local success_connect, error_connect = pcall(function()
 		showErrorMessage("Connection failed: " .. tostring(errcode) .. " - " .. tostring(why))
 	end)
 
-	player = game:GetService("Players"):CreateLocalPlayer(0)
-	client:connect("localhost", 53640, 0)
+	player = game:GetService("Players"):CreateLocalPlayer({{user_id}})
+	client:connect("{{server_ip}}", {{server_port}}, 0)
 end)
 
 if not success_connect then

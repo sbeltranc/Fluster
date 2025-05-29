@@ -1,11 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Play, Settings, Clock, BarChart, Download, Search } from "lucide-react"
+import { Play, Settings, Clock, BarChart, Download, Search } from "lucide-react";
 
-import DashboardProps from "@/interfaces/DashboardProps"
-import ClientCardProps from "@/interfaces/ClientCardProps"
+import { Button } from "@/components/ui/button";
+
+import DashboardProps from "@/interfaces/DashboardProps";
+import ClientCardProps from "@/interfaces/ClientCardProps";
 
 function ClientCard({ version, onLaunch }: ClientCardProps) {
   return (
@@ -39,6 +40,13 @@ function ClientCard({ version, onLaunch }: ClientCardProps) {
         >
           <Play size={16} className="mr-2" />
           Launch
+        </Button>
+
+        <Button
+          variant="outline"
+          className="w-full bg-black hover:bg-white/10 border-bg text-white rounded-md h-9 mt-2 border-0 transition-all duration-200"
+        >
+          Start Server
         </Button>
       </div>
     </div>
