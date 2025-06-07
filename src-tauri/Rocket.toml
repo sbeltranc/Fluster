@@ -1,3 +1,5 @@
 [default]
 address = "127.0.0.1"
 port = 80
+shutdown_timeout = 0
+workers = 1

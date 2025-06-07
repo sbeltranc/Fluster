@@ -1,146 +1,256 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Play, Settings, Clock, BarChart, Download, Search } from "lucide-react";
+import { useState } from "react"
+import { 
+  Play, 
+  Clock, 
+  Download,
+  Server,
+  Grid2X2,
+  List,
+  LayoutGrid
+} from "lucide-react"
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 
-import DashboardProps from "@/interfaces/DashboardProps";
-import ClientCardProps from "@/interfaces/ClientCardProps";
+import DashboardProps from "@/interfaces/DashboardProps"
+import ClientCardProps from "@/interfaces/ClientCardProps"
+import { Input } from "@/components/ui/input"
 
-function ClientCard({ version, onLaunch }: ClientCardProps) {
+function StatCard({ title, value, icon: Icon }: { title: string; value: string; icon: any }) {
   return (
-    <div className="bg-black backdrop-blur-sm rounded-lg border border-white/30 overflow-hidden hover:border-white/50 transition-all duration-200 hover:shadow-[0_0_15px_rgba(255,255,255,0.1)]">
-      <div className="p-4 flex flex-col h-full">
-        <div className="flex justify-between items-start mb-3">
-          <h3 className="text-sm font-medium text-white">{version.name}</h3>
-          <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full hover:bg-white/10">
-            <Settings size={16} className="text-neutral-400" />
-            <span className="sr-only">Settings</span>
-          </Button>
+    <div className="bg-black/20 rounded-xl border border-white/[0.08] p-4">
+      <div className="flex items-center gap-3">
+        <div className="p-2">
+          <Icon size={20} className="text-white/50" />
         </div>
-
-        <div className="space-y-2 mb-4">
-          <div className="flex items-center text-xs text-neutral-400">
-            <Clock size={14} className="mr-2 flex-shrink-0" />
-            <span className="truncate">
-              {version.lastPlayed ? `Last played: ${version.lastPlayed}` : "Never played"}
-            </span>
-          </div>
-          <div className="flex items-center text-xs text-neutral-400">
-            <BarChart size={14} className="mr-2 flex-shrink-0" />
-            <span className="truncate">{version.playTime ? `Play time: ${version.playTime}` : "No play time"}</span>
-          </div>
+        <div>
+          <p className="text-sm text-white/50">{title}</p>
+          <p className="text-xl font-medium text-white">{value}</p>
         </div>
-
-        <Button
-          onClick={() => onLaunch(version.id)}
-          variant="outline"
-          className="w-full bg-white hover:bg-neutral-200 text-black rounded-md h-9 mt-auto border-0 transition-all duration-200"
-        >
-          <Play size={16} className="mr-2" />
-          Launch
-        </Button>
-
-        <Button
-          variant="outline"
-          className="w-full bg-black hover:bg-white/10 border-bg text-white rounded-md h-9 mt-2 border-0 transition-all duration-200"
-        >
-          Start Server
-        </Button>
       </div>
     </div>
   )
 }
 
-export default function Dashboard({ versions, onGetMoreClients, onLaunch, username }: DashboardProps) {
-  const [greeting, setGreeting] = useState("Good day")
-  const [searchQuery, setSearchQuery] = useState("")
+function formatPlayTime(seconds: number): string {
+  if (!seconds) return "Never played";
+  
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  return `${minutes}m`;
+}
 
-  useEffect(() => {
-    const updateGreeting = () => {
-      const hour = new Date().getHours()
+function formatLastPlayed(timestamp: number): string {
+  if (!timestamp) return "Never";
+  
+  const date = new Date(timestamp * 1000);
+  const now = new Date();
+  const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+  
+  if (diffInHours < 1) {
+    return "Just now";
+  } else if (diffInHours < 24) {
+    return `${diffInHours}h ago`;
+  } else {
+    const days = Math.floor(diffInHours / 24);
+    return `${days}d ago`;
+  }
+}
 
-      switch (true) {
-        case hour < 6:
-          setGreeting("Good night")
-          break
-        case hour < 12:
-          setGreeting("Good morning")
-          break
-        case hour < 18:
-          setGreeting("Good afternoon")
-          break
-        default:
-          setGreeting("Good evening")
-      }
-    }
-
-    updateGreeting()
-
-    const interval = setInterval(updateGreeting, 60000)
-    return () => clearInterval(interval)
-  }, [])
-
-  const filteredVersions = versions.filter((version) => version.name.toLowerCase().includes(searchQuery.toLowerCase()))
-
+function ClientCard({ version, onLaunch }: ClientCardProps) {
   return (
-    <div className="h-full w-full overflow-hidden flex flex-col">
-      <div className="px-8 pt-8 pb-4 flex-shrink-0">
-        <div className="flex flex-col space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold text-white">
-              {greeting}, {username}
-            </h2>
-            <Button
-              variant="outline"
-              size="sm"
-              className="bg-black border-white/30 text-white hover:bg-white/10 hover:border-white/50 rounded-md"
-              onClick={onGetMoreClients}
-            >
-              <Download size={14} />
-              Install Clients
-            </Button>
+    <div className="bg-black/20 rounded-xl border border-white/[0.08] p-6 flex flex-col h-full">
+      <div className="flex-grow">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-medium text-white">{version.name}</h3>
+            <p className="text-sm text-white/50 mt-1">{version.id}</p>
           </div>
-
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-neutral-400" size={16} />
-            <input
-              type="text"
-              placeholder="Search clients..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-9 pl-9 pr-4 rounded-md bg-black border border-white/30 text-white text-sm focus:border-white/50 focus:outline-none focus:ring-1 focus:ring-white/20"
-            />
+          {version.stats?.is_running && (
+            <span className="px-2 py-1 text-xs rounded-full bg-green-500/20 text-green-500 font-medium">
+              Running
+            </span>
+          )}
+        </div>
+        <div className="space-y-3 mb-6">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-white/50">Play Time</span>
+            <span className="text-white font-medium">
+              {version.stats ? formatPlayTime(version.stats.total_play_time) : "Never played"}
+            </span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-white/50">Last Played</span>
+            <span className="text-white font-medium">
+              {version.stats ? formatLastPlayed(version.stats.last_played) : "Never"}
+            </span>
           </div>
         </div>
       </div>
 
-      <div className="flex-grow overflow-y-auto px-8 pb-6">
-        {filteredVersions.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-max">
+      <div className="space-y-2 pt-4 border-t border-white/[0.08]">
+        <Button
+          onClick={() => onLaunch(version.id)}
+          className={`w-full h-10 rounded-lg transition-all duration-200 ${
+            version.stats?.is_running
+              ? "bg-green-500/20 text-green-500 hover:bg-green-500/30"
+              : "bg-white/[0.08] hover:bg-white/[0.12] text-white"
+          }`}
+          disabled={version.stats?.is_running}
+        >
+          <Play size={16} className="mr-2" />
+          {version.stats?.is_running ? "Running" : "Launch Client"}
+        </Button>
+
+        <Button
+          variant="outline"
+          className="w-full bg-transparent hover:bg-white/[0.08] text-white rounded-lg h-10 border-white/[0.08] hover:border-white/[0.12] transition-all duration-200"
+        >
+          <Server size={16} className="mr-2" />
+          Start Server
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+export default function Dashboard({ versions, onGetMoreClients, onLaunch, username }: DashboardProps) {
+  const [searchQuery, setSearchQuery] = useState("")
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+  const [isLoading] = useState(false)
+
+  const greeting = (() => {
+    const hour = new Date().getHours()
+    if (hour < 12) return "Good morning"
+    if (hour < 18) return "Good afternoon"
+    return "Good evening"
+  })()
+
+  const filteredVersions = versions.filter((version) => 
+    version.name.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  const totalPlayTime = versions.reduce((total, version) => {
+    return total + (version.stats?.total_play_time || 0)
+  }, 0)
+
+  return (
+    <div className="h-full w-full overflow-hidden flex flex-col bg-[#0A0A0A]">
+      <div className="px-6 pt-6 pb-4 flex-shrink-0 space-y-4">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-bold text-white">
+              {greeting}, {username}
+            </h2>
+            <p className="text-white/50 mt-1">Ready to play some games?</p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="lg"
+              className="bg-white/[0.08] border-white/[0.08] text-white hover:bg-white/[0.12] hover:border-white/[0.12] rounded-lg"
+              onClick={onGetMoreClients}
+            >
+              <Download size={16} className="mr-2" />
+              Install New Client
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              className="bg-white/[0.08] border-white/[0.08] text-white hover:bg-white/[0.12] hover:border-white/[0.12] rounded-lg"
+              onClick={() => window.location.hash = '#discovery'}
+            >
+              <Server size={16} className="mr-2" />
+              Server Browser
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <StatCard 
+            title="Total Clients" 
+            value={versions.length.toString()} 
+            icon={LayoutGrid} 
+          />
+          <StatCard 
+            title="Total Play Time" 
+            value={formatPlayTime(totalPlayTime)} 
+            icon={Clock} 
+          />
+        </div>
+
+        <div className="flex items-center space-x-4">
+          <div className="flex-1">
+            <Input
+              type="text"
+              placeholder="Search clients..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-white/[0.08] border-white/[0.08] text-white placeholder-white/50"
+            />
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className={`rounded-lg ${viewMode === 'grid' ? 'bg-white/[0.08]' : ''}`}
+              onClick={() => setViewMode('grid')}
+            >
+              <Grid2X2 size={16} className="text-white/50" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={`rounded-lg ${viewMode === 'list' ? 'bg-white/[0.08]' : ''}`}
+              onClick={() => setViewMode('list')}
+            >
+              <List size={16} className="text-white/50" />
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-grow overflow-y-auto px-6 pb-6 min-h-0">
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-[250px] rounded-xl" />
+            ))}
+          </div>
+        ) : filteredVersions.length > 0 ? (
+          <div className={`grid gap-3 ${
+            viewMode === "grid" 
+              ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" 
+              : "grid-cols-1"
+          }`}>
             {filteredVersions.map((version) => (
               <ClientCard key={version.id} version={version} onLaunch={onLaunch} />
             ))}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center h-full py-12 text-center">
+          <div className="h-[calc(100%-1rem)] flex flex-col items-center justify-center text-center">
             {searchQuery ? (
               <>
-                <p className="text-neutral-400 mb-2">No clients match your search</p>
-                <p className="text-sm text-neutral-500">Try a different search term</p>
+                <p className="text-lg text-white/90 mb-2">No clients match your search</p>
+                <p className="text-white/50">Try adjusting your search terms</p>
               </>
             ) : (
               <>
-                <p className="text-neutral-400 mb-2">No clients installed</p>
+                <p className="text-lg text-white/90 mb-2">No clients installed</p>
+                <p className="text-white/50 mb-6">Get started by installing your first client</p>
                 <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-4 bg-black border-white/30 text-white hover:bg-white/10 hover:border-white/50"
+                  size="lg"
+                  className="bg-white/[0.08] hover:bg-white/[0.12] text-white rounded-lg"
                   onClick={onGetMoreClients}
                 >
-                  <Download size={14} className="mr-2" />
-                  Install a Client
+                  <Download size={16} className="mr-2" />
+                  Install Client
                 </Button>
               </>
             )}

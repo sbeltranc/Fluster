@@ -2,6 +2,7 @@ use std::time::Duration;
 use std::thread::{self, JoinHandle};
 use std::sync::mpsc::{self, Sender, Receiver};
 use std::net::{TcpListener, UdpSocket, Ipv4Addr, SocketAddr};
+use serde::{Serialize, Deserialize};
 
 const MULTICAST_ADDR: Ipv4Addr = Ipv4Addr::new(239, 255, 42, 17);
 const MULTICAST_PORT: u16 = 58432;
@@ -10,10 +11,16 @@ const BROADCAST_INTERVAL: Duration = Duration::from_secs(5);
 pub mod lan_discovery {
     use super::*;
 
+    #[derive(Serialize, Deserialize)]
+    pub struct ServerInfo {
+        pub port: u16,
+        pub version: String,
+    }
+
     pub struct Client {
         shutdown_tx: Sender<()>,
         discover_thread: JoinHandle<()>,
-        pub receiver: Receiver<SocketAddr>,
+        pub receiver: Receiver<(SocketAddr, ServerInfo)>,
     }
     
     pub struct UdpServer {
@@ -36,7 +43,7 @@ pub mod lan_discovery {
         }
     }
 
-    pub fn start_server(port: u16) -> std::io::Result<UdpServer> {
+    pub fn start_server(port: u16, version: &str) -> std::io::Result<UdpServer> {
         let tcp_listener = TcpListener::bind(("0.0.0.0", port))?;
         let actual_port = tcp_listener.local_addr()?.port();
 
@@ -44,6 +51,7 @@ pub mod lan_discovery {
         udp_socket.set_ttl(1)?;
 
         let (shutdown_tx, shutdown_rx) = mpsc::channel();
+        let version = version.to_string();
 
         let broadcast_thread = thread::spawn(move || {
             let destination = (MULTICAST_ADDR, MULTICAST_PORT);
@@ -53,8 +61,13 @@ pub mod lan_discovery {
                     break;
                 }
 
-                let message = actual_port.to_string();
-                if let Err(e) = udp_socket.send_to(message.as_bytes(), destination) {
+                let server_info = ServerInfo {
+                    port: actual_port,
+                    version: version.clone(),
+                };
+
+                let message = serde_json::to_string(&server_info).unwrap_or_default();
+                if let Err(_) = udp_socket.send_to(message.as_bytes(), destination) {
                     break;
                 }
 
@@ -90,15 +103,15 @@ pub mod lan_discovery {
                 match udp_socket.recv_from(&mut buf) {
                     Ok((size, src)) => {
                         let message = String::from_utf8_lossy(&buf[..size]);
-
-                        if let Ok(port) = message.parse::<u16>() {
-                            let addr = SocketAddr::new(src.ip(), port);
-                            if let Err(e) = addr_tx.send(addr) {
+                        
+                        if let Ok(server_info) = serde_json::from_str::<ServerInfo>(&message) {
+                            let addr = SocketAddr::new(src.ip(), server_info.port);
+                            if let Err(_) = addr_tx.send((addr, server_info)) {
                                 break;
                             }
                         }
                     },
-                    Err(e) => {
+                    Err(_) => {
                         break;
                     }
                 }

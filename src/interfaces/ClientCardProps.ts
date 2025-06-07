@@ -1,4 +1,4 @@
-import VersionData from "./VersionData";
+import { VersionData } from "./VersionData"
 
 export default interface ClientCardProps {
   version: VersionData

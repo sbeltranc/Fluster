@@ -22,12 +22,12 @@ export default function MenuBar({ onMinimize, onClose }: MenuBarProps) {
     checkTauri()
   }, [])
 
-  if (!isTauri) return null // hydration error fix :(
+  if (!isTauri) return null
 
   return (
     <div
       data-tauri-drag-region
-      className="absolute top-0 left-0 right-0 z-50 h-6 flex justify-end items-center pointer-events-none"
+      className="absolute top-0 left-0 right-0 z-50 h-6 flex justify-end items-center"
     >
       <div className="flex pointer-events-auto">
         <button
