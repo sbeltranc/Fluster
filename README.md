@@ -1,14 +1,25 @@
 <div align="center">
 
   # Fluster
-  An (attempt to make a) minimal launcher for old versions of the [Roblox Client](https://www.roblox.com/) 
+  An minimal launcher for old versions of the [Roblox Client](https://www.roblox.com/) 
   <br>
 
   [Installation](#installation) • [Features](#features) • [Building](#building) • [Roadmap](#roadmap)
 </div>
 
 # Installation
-Fluster is currently under development. There is no official release version or dev version, [but you can always try compiling it.](#building)
+Installation is pretty straight forward on Fluster
+
+1. **Go to the releases tab on GitHub**
+https://github.com/sbeltranc/Fluster/releases
+
+2. **Download the installation program**
+You're searching for a file called `Fluster_X.X.X_x64_en-US.msi`
+
+3. **Run the installation program**
+It will ask you for administration permissions, give them out so it can distribute the files!
+
+4. **Enjoy!** You can follow the instructions that Fluster itself gives you when you first start the launcher, if you have any issues, [report them at here!](https://github.com/sbeltranc/Fluster/issues)
 
 # Features
 - **Vanilla 🍦**: Old Roblox Launchers tend to heavily modify the game experience by adding band-aid fixes, Fluster sticks to don't remove or edit anything from the game clients if not required.
@@ -19,7 +30,7 @@ Fluster is currently under development. There is no official release version or 
 # Roadmap
 (this doesn't have any particular order and i can start or stop with any of this at any time..)
 
-- [ ] Be able to see and join hosted servers on your LAN network
+- [x] Be able to see and join hosted servers on your LAN network
 - [ ] Add a compatibility layer to both Linux and MacOS for launching the game clients
 - [ ] Verifiying the game file integrity and update the game files if required to do so
 - [ ] Compatibility with older versions of Windows (might not be possible due to webview)
