@@ -41,25 +41,103 @@ const HOSTS_ENTRIES: &str = "\
 127.0.0.1 www.fluster.is
 ";
 
-fn write_hosts_file() -> Result<String, String> {
-    let hosts_path = match std::env::consts::OS {
-        "windows" => r"C:\Windows\System32\drivers\etc\hosts",
-        _ => "/etc/hosts",
-    };
+#[tauri::command]
+fn setup_hosts_file() -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::ffi::OsStrExt;
+        use winapi::um::{shellapi::ShellExecuteW, winuser::SW_HIDE};
 
-    if !std::path::Path::new(hosts_path).exists() {
-        return Err(format!("Hosts file not found at {}", hosts_path));
+        let hosts_path = r"C:\Windows\System32\drivers\etc\hosts";
+
+        if !std::path::Path::new(hosts_path).exists() {
+            return Err(format!("Hosts file not found at {}", hosts_path));
+        }
+
+        let mut file = match std::fs::OpenOptions::new().read(true).open(hosts_path) {
+            Ok(file) => file,
+            Err(e) => return match e.kind() {
+                std::io::ErrorKind::PermissionDenied => Err(
+                    "Permission denied while opening the hosts file. Please run Fluster as administrator once."
+                        .to_string(),
+                ),
+                std::io::ErrorKind::NotFound => {
+                    Err(format!("Hosts file not found at {}", hosts_path))
+                }
+                _ => Err(format!("Failed to open hosts file: {}", e)),
+            },
+        };
+
+        if file.metadata().is_ok() {
+            let mut contents = String::new();
+
+            file.read_to_string(&mut contents)
+                .map_err(|e| format!("Failed to read hosts file: {}", e))?;
+
+            if contents.contains(HOSTS_ENTRIES) {
+                return Ok("Hosts file already contains Fluster entries".to_string());
+            }
+        }
+
+        fn to_wide(s: &str) -> Vec<u16> {
+            OsStr::new(s).encode_wide().chain(Some(0)).collect()
+        }
+
+        let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        let exe_w = to_wide(&exe.to_string_lossy());
+        let verb = to_wide("runas");
+        let args = to_wide("--write-hosts");
+
+        let result = unsafe {
+            ShellExecuteW(
+                std::ptr::null_mut(),
+                verb.as_ptr(),
+                exe_w.as_ptr(),
+                args.as_ptr(),
+                std::ptr::null(),
+                SW_HIDE,
+            )
+        };
+
+        if (result as isize) <= 32 {
+            Err("We couldn't add the local Fluster Domains onto your machine, did you accept the UAC prompt?".into())
+        } else {
+            Ok("Setup the local Fluster Domains onto the machine!".into())
+        }
     }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let hosts_path = "/etc/hosts";
 
-    let mut file = std::fs::OpenOptions::new()
-        .append(true)
-        .open(hosts_path)
-        .map_err(|e| format!("Failed to open hosts file: {}", e))?;
+        if !std::path::Path::new(hosts_path).exists() {
+            return Err(format!("Hosts file not found at {}", hosts_path));
+        }
 
-    file.write_all(HOSTS_ENTRIES.as_bytes())
-        .map_err(|e| format!("Failed to write to hosts file: {}", e))?;
+        let contents = std::fs::read_to_string(hosts_path)
+            .map_err(|e| format!("Failed to read hosts file: {}", e))?;
 
-    Ok("Hosts file updated successfully".to_string())
+        if contents.contains(HOSTS_ENTRIES) {
+            return Ok("Hosts file already contains Fluster entries".to_string());
+        }
+
+        let mut file = match std::fs::OpenOptions::new().append(true).open(hosts_path) {
+            Ok(file) => file,
+            Err(e) => {
+                return match e.kind() {
+                    std::io::ErrorKind::PermissionDenied => Err(
+                        "Permission denied to write to hosts file. Please run with sudo."
+                            .to_string(),
+                    ),
+                    _ => Err(format!("Failed to open hosts file for writing: {}", e)),
+                }
+            }
+        };
+
+        writeln!(file, "\n{}", HOSTS_ENTRIES)
+            .map_err(|e| format!("Failed to write to hosts file: {}", e))?;
+
+        Ok("Hosts file updated successfully.".to_string())
+    }
 }
 
 #[tauri::command]
@@ -440,79 +518,6 @@ async fn install_client(version: &str) -> Result<bool, String> {
 }
 
 #[tauri::command]
-fn setup_hosts_file() -> Result<String, String> {
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::ffi::OsStrExt;
-        use winapi::um::{shellapi::ShellExecuteW, winuser::SW_HIDE};
-
-        let hosts_path = match std::env::consts::OS {
-            "windows" => r"C:\Windows\System32\drivers\etc\hosts",
-            _ => "/etc/hosts",
-        };
-
-        if !std::path::Path::new(hosts_path).exists() {
-            return Err(format!("Hosts file not found at {}", hosts_path));
-        }
-
-        let mut file = match std::fs::OpenOptions::new().read(true).open(hosts_path) {
-            Ok(file) => file,
-            Err(e) => return match e.kind() {
-                std::io::ErrorKind::PermissionDenied => Err(
-                    "Permission denied while opening the hosts file. Please run Fluster as administrator once."
-                        .to_string(),
-                ),
-                std::io::ErrorKind::NotFound => {
-                    Err(format!("Hosts file not found at {}", hosts_path))
-                }
-                _ => Err(format!("Failed to open hosts file: {}", e)),
-            },
-        };
-
-        if file.metadata().is_ok() {
-            let mut contents = String::new();
-
-            file.read_to_string(&mut contents)
-                .map_err(|e| format!("Failed to read hosts file: {}", e))?;
-
-            if contents.contains(HOSTS_ENTRIES) {
-                return Ok("Hosts file already contains Fluster entries".to_string());
-            }
-        }
-
-        fn to_wide(s: &str) -> Vec<u16> {
-            OsStr::new(s).encode_wide().chain(Some(0)).collect()
-        }
-
-        let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-        let exe_w = to_wide(&exe.to_string_lossy());
-        let verb = to_wide("runas");
-        let args = to_wide("--write-hosts");
-
-        let result = unsafe {
-            ShellExecuteW(
-                std::ptr::null_mut(),
-                verb.as_ptr(),
-                exe_w.as_ptr(),
-                args.as_ptr(),
-                std::ptr::null(),
-                SW_HIDE,
-            )
-        };
-
-        if (result as isize) <= 32 {
-            Err("We couldn't add the local Fluster Domains onto your machine, did you accept the UAC prompt?".into())
-        } else {
-            Ok("Setup the local Fluster Domains onto the machine!".into())
-        }
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        write_hosts_file()
-    }
-}
-
-#[tauri::command]
 fn uninstall_client(version: &str) -> Result<String, String> {
     let versions = match utils::appdata::return_versions() {
         Ok(path) => path,
@@ -668,9 +673,42 @@ fn get_version_size(version: &str) -> Result<String, String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     if std::env::args().any(|arg| arg == "--write-hosts") {
-        match write_hosts_file() {
-            Ok(_) => std::process::exit(0),
-            Err(_) => std::process::exit(1),
+        use std::io::{Read, Write};
+        let result = (|| -> Result<String, String> {
+            let hosts_path = r"C:\Windows\System32\drivers\etc\hosts";
+
+            let mut contents = String::new();
+            // Open for reading
+            let mut file = std::fs::File::open(hosts_path)
+                .map_err(|e| format!("Failed to open hosts file for reading: {}", e))?;
+            file.read_to_string(&mut contents)
+                .map_err(|e| format!("Failed to read hosts file: {}", e))?;
+
+            if contents.contains(HOSTS_ENTRIES) {
+                return Ok("Hosts file already contains Fluster entries".to_string());
+            }
+
+            // If not present, open for appending
+            let mut file = std::fs::OpenOptions::new()
+                .append(true)
+                .open(hosts_path)
+                .map_err(|e| format!("Failed to open hosts file for writing: {}", e))?;
+
+            writeln!(file, "\n{}", HOSTS_ENTRIES)
+                .map_err(|e| format!("Failed to write to hosts file: {}", e))?;
+
+            Ok("Hosts file updated successfully".to_string())
+        })();
+
+        match result {
+            Ok(msg) => {
+                println!("{}", msg);
+                std::process::exit(0);
+            }
+            Err(e) => {
+                eprintln!("Error writing hosts file: {}", e);
+                std::process::exit(1);
+            }
         }
     }
 
