@@ -1,294 +1,97 @@
-"use client"
+"use client";
 
-import { useState, useCallback, useEffect } from "react"
-import { toast } from "sonner"
-import { 
-  ArrowRight, 
-  Settings, 
-  Shield, 
-  Loader2,
-  Server
-} from "lucide-react"
+import { useState, useEffect } from "react";
+import { Loader2 } from "lucide-react";
 
-import BackgroundPaths from "./components/tabs/background-paths"
-import SetupScreen from "./components/tabs/setup-screen"
-import Dashboard from "./components/tabs/dashboard"
-import MenuBar from "./components/tabs/menu-bar"
-import DiscoveryScreen from "./components/tabs/discovery-screen"
+import BackgroundPaths from "./components/tabs/background-paths";
+import SetupScreen from "./components/tabs/setup-screen";
+import Dashboard from "./components/tabs/dashboard";
+import MenuBar from "./components/tabs/menu-bar";
+import DiscoveryScreen from "./components/tabs/discovery-screen";
+import { WelcomeScreen } from "./components/screens/WelcomeScreen";
 
-import { invoke } from "@tauri-apps/api/core"
-import { getCurrentWindow } from "@tauri-apps/api/window"
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
-import { VersionData, VersionStats } from "./interfaces/VersionData"
-import { ServerInfo } from "./interfaces/ServerInfo"
-import { Button } from "./components/ui/button"
-
-function WelcomeScreen({ onStartSetup }: { onStartSetup: () => void }) {
-  return (
-    <div className="h-full w-full overflow-hidden flex flex-col items-center justify-center bg-[#0A0A0A]">
-      <div className="text-center space-y-4 max-w-md">
-        <div className="space-y-2">
-          <h2 className="text-5xl font-bold text-white">
-            fluster
-          </h2>
-          <div className="h-1 w-12 bg-white/20 mx-auto rounded-full"></div>
-          <p className="text-xl text-white/60">we put games on your not so phone</p>
-        </div>
-
-        <Button
-          variant="outline"
-          size="lg"
-          className="mt-8 bg-white/[0.08] border-white/[0.08] text-white hover:bg-white/[0.12] hover:border-white/[0.12] rounded-full px-8"
-          onClick={onStartSetup}
-        >
-          <ArrowRight size={16} className="mr-2" />
-          Get Started
-        </Button>
-      </div>
-    </div>
-  )
-}
-
-const dataService = {
-  getAvailableVersions: async (): Promise<VersionData[]> => {
-    const versions: VersionData[] = [
-      {
-        id: "version-997deaae24a8",
-        name: "Roblox 2008E",
-        size: await invoke<string>("get_version_size", { version: "version-997deaae24a8" }),
-        installed: await dataService.versionInstalled("version-997deaae24a8"),
-        installing: false,
-        stats: undefined
-      }
-    ];
-
-    for (const version of versions) {
-      try {
-        const statsJson = await invoke<string>("get_version_stats", { version: version.id });
-        version.stats = JSON.parse(statsJson) as VersionStats;
-      } catch (error) {
-        console.error(`Failed to fetch stats for version ${version.id}:`, error);
-      }
-    }
-
-    return versions;
-  },
-
-  getUserInfo: async (): Promise<{ username: string }> => {
-    return { username: await invoke("get_device_username") }
-  },
-
-  installVersion: async (version: string): Promise<boolean> => {
-    return await invoke("install_client", { version });
-  },
-
-  uninstallVersion: async (version: string): Promise<string> => {
-    return await invoke("uninstall_client", { version });
-  },
-
-  versionInstalled: async (version: string): Promise<boolean> => {
-    return await invoke("is_version_installed", { version });
-  },
-
-  launchVersion: async (version: string): Promise<boolean> => {
-    return await invoke("launch_client", { version });
-  },
-
-  getVersionStats: async (version: string): Promise<VersionStats> => {
-    const statsJson = await invoke<string>("get_version_stats", { version });
-    return JSON.parse(statsJson) as VersionStats;
-  },
-
-  getVersionSize: async (version: string): Promise<string> => {
-    return await invoke("get_version_size", { version });
-  },
-}
+import { ServerInfo } from "./interfaces/ServerInfo";
+import { useVersions } from "./hooks/useVersions";
+import { useView } from "./hooks/useView";
+import dataService from "./services/dataService";
+import { showToast } from "./utils/toast";
 
 export default function App() {
-  const [versions, setVersions] = useState<VersionData[]>([])
-  const [username, setUsername] = useState<string>("")
-  const [isLoading, setIsLoading] = useState<boolean>(true)
-  const [isInstalling, setIsInstalling] = useState(false)
-  const [currentView, setCurrentView] = useState<"welcome" | "setup" | "dashboard" | "discovery">("welcome")
-  const [hideInstalledInAvailable, setHideInstalledInAvailable] = useState(false)
+  const { currentView, navigateTo, handleStartSetup } = useView();
+  const {
+    versions,
+    isLoading: isVersionsLoading,
+    isInstalling,
+    availableVersions,
+    installingVersions,
+    installedVersions,
+    handleInstall,
+    handleUninstall,
+  } = useVersions();
+
+  const [username, setUsername] = useState<string>("");
+  const [isUserLoading, setIsUserLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true)
-
+    const fetchUserInfo = async () => {
+      setIsUserLoading(true);
       try {
-        const [versionsData, userInfo] = await Promise.all([
-          dataService.getAvailableVersions(),
-          dataService.getUserInfo(),
-        ])
-
-        const isFlusterSetup = await invoke("is_fluster_setup");
-
-        if (isFlusterSetup) {
-          setCurrentView("dashboard")
-        }
-
-        setVersions(versionsData)
-        setUsername(userInfo.username)
+        const userInfo = await dataService.getUserInfo();
+        setUsername(userInfo.username);
       } catch (error) {
-        console.error("Failed to load initial data:", error)
+        console.error("Failed to load user data:", error);
+        showToast("Error", { description: "Failed to load user data." });
       } finally {
-        setIsLoading(false)
-      }
-    }
-
-    loadData()
-
-    const handleHashChange = () => {
-      const hash = window.location.hash.slice(1);
-      if (hash === 'discovery') {
-        setCurrentView('discovery');
-      } else if (hash === 'dashboard') {
-        setCurrentView('dashboard');
+        setIsUserLoading(false);
       }
     };
+    fetchUserInfo();
+  }, []);
 
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
-  }, [])
-
-  const handleInstall = async (id: string) => {
-    setIsInstalling(true);
-
+  const handleMinimize = async () => {
     try {
-        const installResult = await dataService.installVersion(id);
-        const isInstalled = await dataService.versionInstalled(id);
-        
-        if (isInstalled) {
-            const freshVersions = await dataService.getAvailableVersions();
-            setVersions(freshVersions);
-        } else {
-            throw new Error("Installation completed but client was not found");
-        }
-
-        setIsInstalling(false);
-    } catch (error) {
-        setIsInstalling(false);
-        toast(`Something went wrong while installing ${id}`, {
-            description: `${error}`,
-            duration: 3000,
-            action: {
-                label: "Retry",
-                onClick: () => handleInstall(id),
-            },
-        });
-
-        console.error(`Failed to install version ${id}:`, error);
+      await getCurrentWindow().minimize();
+    } catch (e) {
+      console.error("Failed to minimize window:", e);
     }
-  }
+  };
 
-  const handleUninstall = async (id: string) => {
+  const handleClose = async () => {
     try {
-      const success = await dataService.uninstallVersion(id)
-      if (success) {
-        setVersions(versions.map((v) => (v.id === id ? { ...v, installed: false } : v)))
-      }
-    } catch (error) {
-      toast(`Something went wrong while uninstalling ${id}`, {
-        description: `${error}`,
-        duration: 3000,
-        action: {
-          label: "Retry",
-          onClick: () => handleUninstall(id),
-        },
-      })
-
-      console.error(`Failed to uninstall version ${id}:`, error)
+      await getCurrentWindow().close();
+    } catch (e) {
+      console.error("Failed to close window:", e);
     }
-  }
-
-  const handleGetMoreClients = () => {
-    setHideInstalledInAvailable(true)
-    setCurrentView("setup")
-  }
-
-  const handleStartSetup = async () => {
-    try {
-      await invoke("setup_hosts_file");
-      await invoke("fluster_setup")
-        
-      setHideInstalledInAvailable(false)
-      setCurrentView("setup")
-    } catch (error) {
-      toast("Failed to setup", {
-        description: `${error}`,
-        duration: 5000,
-        action: {
-          label: "Retry",
-          onClick: () => handleStartSetup(),
-        },
-      })
-
-      console.error("Failed to setup Fluster dependencies:", error)
-    }
-  }
-
-  const handleGoToDashboard = () => {
-    setCurrentView("dashboard")
-  }
+  };
 
   const handleLaunch = async (id: string) => {
     try {
       await dataService.launchVersion(id);
     } catch (error) {
-      toast("An error occurred", {
-        description: `${error}`,
-        duration: 5000,
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      showToast("An error occurred", {
+        description: errorMessage,
         action: {
           label: "Retry",
           onClick: () => handleLaunch(id),
         },
-      })
-
-      console.error(`Failed to launch version ${id}:`, error)
+      });
+      console.error(`Failed to launch version ${id}:`, error);
     }
-  }
-
-  const handleMinimize = useCallback(async () => {
-    try {
-      await getCurrentWindow().minimize()
-    } catch (e) {
-      console.error("failed to minimize the window for whatever reason", e)
-    }
-  }, [])
-
-  const handleClose = useCallback(async () => {
-    try {
-      await getCurrentWindow().close()
-    } catch (e) {
-      console.error("failed to close the window for whatever reason", e)
-    }
-  }, [])
-
-  const availableVersions = versions.filter((v) => {
-    if (hideInstalledInAvailable) {
-      return !v.installed && !v.installing
-    } else {
-      return !v.installed && !v.installing
-    }
-  })
-
-  const installingVersions = versions.filter((v) => v.installing)
-  const installedVersions = versions.filter((v) => v.installed && !v.installing)
+  };
 
   const handleJoinServer = async (server: ServerInfo, version: string) => {
     try {
-      await invoke("launch_server_connection", {
-        version,
-        serverId: server.id,
-        serverIp: server.host,
-        serverPort: server.port,
-        userId: 1
-      });
+      // this could be dynamic, but for now, we'll assume userId is 1
+      await dataService.launchServerConnection(server, version, 1);
     } catch (error) {
-      toast("Failed to join server", {
-        description: `${error}`,
-        duration: 5000,
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      showToast("Failed to join server", {
+        description: errorMessage,
         action: {
           label: "Retry",
           onClick: () => handleJoinServer(server, version),
@@ -297,6 +100,8 @@ export default function App() {
       console.error("Failed to join server:", error);
     }
   };
+
+  const isLoading = isVersionsLoading || isUserLoading;
 
   if (isLoading) {
     return (
@@ -310,18 +115,15 @@ export default function App() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
-  return (
-    <div className="relative h-[450px] w-[800px] flex items-center justify-center overflow-hidden bg-black shadow-2xl">
-      <BackgroundPaths />
-      <MenuBar onMinimize={handleMinimize} onClose={handleClose} />
-      <div className="relative z-10 w-full h-full">
-        {currentView === "welcome" && (
-          <WelcomeScreen onStartSetup={handleStartSetup} />
-        )}
-        {currentView === "setup" && (
+  const renderCurrentView = () => {
+    switch (currentView) {
+      case "welcome":
+        return <WelcomeScreen onStartSetup={handleStartSetup} />;
+      case "setup":
+        return (
           <SetupScreen
             availableVersions={availableVersions}
             installingVersions={installingVersions}
@@ -329,28 +131,36 @@ export default function App() {
             isInstalling={isInstalling}
             onInstall={handleInstall}
             onUninstall={handleUninstall}
-            onGoToDashboard={handleGoToDashboard}
+            onGoToDashboard={() => navigateTo("dashboard")}
           />
-        )}
-        {currentView === "dashboard" && (
+        );
+      case "dashboard":
+        return (
           <Dashboard
             versions={versions}
-            onGetMoreClients={handleGetMoreClients}
+            onGetMoreClients={() => navigateTo("setup")}
             onLaunch={handleLaunch}
             username={username}
           />
-        )}
-        {currentView === "discovery" && (
+        );
+      case "discovery":
+        return (
           <DiscoveryScreen
             versions={versions}
-            onBack={() => {
-              window.location.hash = '';
-              setCurrentView('dashboard');
-            }}
+            onBack={() => navigateTo("dashboard")}
             onJoinServer={handleJoinServer}
           />
-        )}
-      </div>
+        );
+      default:
+        return <WelcomeScreen onStartSetup={handleStartSetup} />;
+    }
+  };
+
+  return (
+    <div className="relative h-[450px] w-[800px] flex items-center justify-center overflow-hidden bg-black shadow-2xl">
+      <BackgroundPaths />
+      <MenuBar onMinimize={handleMinimize} onClose={handleClose} />
+      <div className="relative z-10 w-full h-full">{renderCurrentView()}</div>
     </div>
-  )
+  );
 }

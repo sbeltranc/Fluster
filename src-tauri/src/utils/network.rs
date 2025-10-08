@@ -1,8 +1,8 @@
-use std::time::Duration;
+use serde::{Deserialize, Serialize};
+use std::net::{Ipv4Addr, SocketAddr, TcpListener, UdpSocket};
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread::{self, JoinHandle};
-use std::sync::mpsc::{self, Sender, Receiver};
-use std::net::{TcpListener, UdpSocket, Ipv4Addr, SocketAddr};
-use serde::{Serialize, Deserialize};
+use std::time::Duration;
 
 const MULTICAST_ADDR: Ipv4Addr = Ipv4Addr::new(239, 255, 42, 17);
 const MULTICAST_PORT: u16 = 58432;
@@ -22,7 +22,7 @@ pub mod lan_discovery {
         discover_thread: JoinHandle<()>,
         pub receiver: Receiver<(SocketAddr, ServerInfo)>,
     }
-    
+
     pub struct UdpServer {
         shutdown_tx: Sender<()>,
         broadcast_thread: JoinHandle<()>,
@@ -32,14 +32,18 @@ pub mod lan_discovery {
     impl UdpServer {
         pub fn stop(self) {
             let _ = self.shutdown_tx.send(());
-            let _ = self.broadcast_thread.join();
+            if let Err(e) = self.broadcast_thread.join() {
+                eprintln!("Broadcast thread panicked: {:?}", e);
+            }
         }
     }
 
     impl Client {
         pub fn stop(self) {
             let _ = self.shutdown_tx.send(());
-            let _ = self.discover_thread.join();
+            if let Err(e) = self.discover_thread.join() {
+                eprintln!("Discovery thread panicked: {:?}", e);
+            }
         }
     }
 
@@ -55,7 +59,7 @@ pub mod lan_discovery {
 
         let broadcast_thread = thread::spawn(move || {
             let destination = (MULTICAST_ADDR, MULTICAST_PORT);
-            
+
             loop {
                 if shutdown_rx.try_recv().is_ok() {
                     break;
@@ -67,7 +71,8 @@ pub mod lan_discovery {
                 };
 
                 let message = serde_json::to_string(&server_info).unwrap_or_default();
-                if let Err(_) = udp_socket.send_to(message.as_bytes(), destination) {
+                if let Err(e) = udp_socket.send_to(message.as_bytes(), destination) {
+                    eprintln!("Failed to send broadcast: {}", e);
                     break;
                 }
 
@@ -84,11 +89,8 @@ pub mod lan_discovery {
 
     pub fn start_discovery() -> std::io::Result<Client> {
         let udp_socket = UdpSocket::bind((Ipv4Addr::UNSPECIFIED, MULTICAST_PORT))?;
-        
-        udp_socket.join_multicast_v4(
-            &MULTICAST_ADDR, 
-            &Ipv4Addr::UNSPECIFIED
-        )?;
+
+        udp_socket.join_multicast_v4(&MULTICAST_ADDR, &Ipv4Addr::UNSPECIFIED)?;
 
         let (addr_tx, addr_rx) = mpsc::channel();
         let (shutdown_tx, shutdown_rx) = mpsc::channel();
@@ -103,15 +105,17 @@ pub mod lan_discovery {
                 match udp_socket.recv_from(&mut buf) {
                     Ok((size, src)) => {
                         let message = String::from_utf8_lossy(&buf[..size]);
-                        
+
                         if let Ok(server_info) = serde_json::from_str::<ServerInfo>(&message) {
                             let addr = SocketAddr::new(src.ip(), server_info.port);
-                            if let Err(_) = addr_tx.send((addr, server_info)) {
+                            // it's ok if the receiver is disconnected
+                            if addr_tx.send((addr, server_info)).is_err() {
                                 break;
                             }
                         }
-                    },
-                    Err(_) => {
+                    }
+                    Err(e) => {
+                        eprintln!("udp recv error: {}", e);
                         break;
                     }
                 }

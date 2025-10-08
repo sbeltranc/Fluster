@@ -1,15 +1,15 @@
-use std::fs::{self, File};
-use std::io::{Write, copy};
-use std::time::{SystemTime, UNIX_EPOCH};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
+use std::fs::{self, File};
+use std::io::{copy, Write};
 use std::path::Path;
+use std::time::{SystemTime, UNIX_EPOCH};
 
+use tauri::{AppHandle, Emitter};
 use zip::ZipArchive;
-use tauri::{ AppHandle, Emitter };
 
-mod utils;
 mod routes;
+mod utils;
 
 use routes::*;
 
@@ -19,18 +19,18 @@ struct VersionStats {
     last_played: u64,
     is_running: bool,
     start_time: Option<u64>,
-    size_bytes: u64
+    size_bytes: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct VersionsData {
-    versions: HashMap<String, VersionStats>
+    versions: HashMap<String, VersionStats>,
 }
 
 impl Default for VersionsData {
     fn default() -> Self {
         VersionsData {
-            versions: HashMap::new()
+            versions: HashMap::new(),
         }
     }
 }
@@ -75,7 +75,7 @@ fn start_listening(app: AppHandle) -> Result<(), String> {
                     "port": addr.port(),
                     "version": server_info.version
                 });
-                
+
                 app.emit("discovery", discovery_info.to_string())
                     .unwrap_or_else(|e| eprintln!("Failed to emit discovery event: {}", e));
             }
@@ -113,7 +113,10 @@ fn start_server(version: &str, file_path: &str) -> Result<(), String> {
         .arg(file_path)
         .arg("-no3d")
         .arg("-script")
-        .arg(format!("loadfile('http://www.fluster.is/game/gameserver.ashx')(0, {})", port.to_string())) 
+        .arg(format!(
+            "loadfile('http://www.fluster.is/game/gameserver.ashx')(0, {})",
+            port.to_string()
+        ))
         .spawn()
         .map_err(|_| "Failed to launch the server.".to_string())?;
 
@@ -155,23 +158,21 @@ fn launch_server_connection(
         Ok(_) => {
             let version_owned = version.to_string();
             update_version_stats(&version_owned, true);
-            
+
             std::thread::spawn(move || {
-                            std::thread::sleep(std::time::Duration::from_secs(2));
-            
-            loop {
+                std::thread::sleep(std::time::Duration::from_secs(2));
+
+                loop {
                     std::thread::sleep(std::time::Duration::from_secs(5));
-                    
-                                    let process_name = if cfg!(target_os = "windows") {
+
+                    let process_name = if cfg!(target_os = "windows") {
                         "Roblox.exe"
                     } else {
                         "Roblox"
                     };
-                    
-                    let output = std::process::Command::new("ps")
-                        .arg("aux")
-                        .output();
-                    
+
+                    let output = std::process::Command::new("ps").arg("aux").output();
+
                     match output {
                         Ok(output) => {
                             let processes = String::from_utf8_lossy(&output.stdout);
@@ -180,16 +181,16 @@ fn launch_server_connection(
                                 break;
                             }
                         }
-                                            Err(_) => {
-                        update_version_stats(&version_owned, false);
-                        break;
-                    }
+                        Err(_) => {
+                            update_version_stats(&version_owned, false);
+                            break;
+                        }
                     }
                 }
             });
             Ok(true)
         }
-        Err(_) => Err("Failed to launch the client.".to_string())
+        Err(_) => Err("Failed to launch the client.".to_string()),
     }
 }
 
@@ -213,7 +214,7 @@ fn get_device_username() -> String {
 
         return String::from_utf8_lossy(&buffer[..size as usize - 1]).to_string();
     }
-    
+
     return username;
 }
 
@@ -228,22 +229,20 @@ fn launch_client(version: &str) -> Result<bool, String> {
     if result.is_ok() {
         let version_owned = version.to_string();
         update_version_stats(&version_owned, true);
-        
-                    std::thread::spawn(move || {
+
+        std::thread::spawn(move || {
             std::thread::sleep(std::time::Duration::from_secs(2));
             loop {
                 std::thread::sleep(std::time::Duration::from_secs(5));
-                
+
                 let process_name = if cfg!(target_os = "windows") {
                     "Roblox.exe"
                 } else {
                     "Roblox"
                 };
-                
-                let output = std::process::Command::new("ps")
-                    .arg("aux")
-                    .output();
-                
+
+                let output = std::process::Command::new("ps").arg("aux").output();
+
                 match output {
                     Ok(output) => {
                         let processes = String::from_utf8_lossy(&output.stdout);
@@ -268,16 +267,13 @@ fn is_fluster_setup() -> bool {
     return utils::appdata::is_fluster_setup();
 }
 
-#[tauri::command]   
+#[tauri::command]
 fn fluster_setup() -> Result<bool, String> {
-    utils::appdata::return_versions()
-        .ok();
+    utils::appdata::return_versions().ok();
 
-    utils::appdata::return_downloads()
-        .ok();
+    utils::appdata::return_downloads().ok();
 
-    utils::appdata::return_cache()
-        .ok();
+    utils::appdata::return_cache().ok();
 
     return Ok(true);
 }
@@ -285,12 +281,12 @@ fn fluster_setup() -> Result<bool, String> {
 #[tauri::command]
 async fn install_client(version: &str) -> Result<bool, String> {
     println!("starting installation for version: {}", version);
-    
+
     let versions = match utils::appdata::return_versions() {
         Ok(path) => {
             println!("versions directory: {:?}", path);
             path
-        },
+        }
         Err(e) => return Err(format!("Failed to get the versions directory: {}", e)),
     };
 
@@ -298,7 +294,7 @@ async fn install_client(version: &str) -> Result<bool, String> {
         Ok(path) => {
             println!("downloads directory: {:?}", path);
             path
-        },
+        }
         Err(e) => return Err(format!("Failed to get the downloads directory: {}", e)),
     };
 
@@ -311,7 +307,7 @@ async fn install_client(version: &str) -> Result<bool, String> {
     println!("downloading from url: {}", url);
     let dest_zip = downloads.join(version);
     println!("download destination: {:?}", dest_zip);
-    
+
     let response = reqwest::get(&url)
         .await
         .map_err(|e| format!("Failed to contact with the Fluster Storage: {}", e))?;
@@ -319,16 +315,24 @@ async fn install_client(version: &str) -> Result<bool, String> {
     println!("download response status: {}", response.status());
 
     if response.status() == reqwest::StatusCode::NOT_FOUND {
-        return Err(format!("{} was not available on the Fluster Storage", version));
+        return Err(format!(
+            "{} was not available on the Fluster Storage",
+            version
+        ));
     }
 
     if response.status() != reqwest::StatusCode::OK || response.content_length().is_none() {
-        return Err(format!("Failed to download {} for error code {}", version, response.status()));
+        return Err(format!(
+            "Failed to download {} for error code {}",
+            version,
+            response.status()
+        ));
     }
 
     println!("content length: {:?}", response.content_length());
 
-    let content = response.bytes()
+    let content = response
+        .bytes()
         .await
         .map_err(|e| format!("Failed to read the response body: {}", e))?;
 
@@ -341,13 +345,15 @@ async fn install_client(version: &str) -> Result<bool, String> {
 
     println!("successfully wrote zip file to: {:?}", dest_zip);
 
-    let file = File::open(&dest_zip)
-        .map_err(|e| format!("Failed to open the zip file: {}", e))?;
+    let file = File::open(&dest_zip).map_err(|e| format!("Failed to open the zip file: {}", e))?;
 
-    let mut archive = ZipArchive::new(file)
-        .map_err(|e| format!("Failed to create the zip archive: {}", e))?;
+    let mut archive =
+        ZipArchive::new(file).map_err(|e| format!("Failed to create the zip archive: {}", e))?;
 
-    println!("successfully opened zip archive with {} files", archive.len());
+    println!(
+        "successfully opened zip archive with {} files",
+        archive.len()
+    );
 
     let version_path = versions.join(version);
     println!("target installation path: {:?}", version_path);
@@ -378,13 +384,11 @@ async fn install_client(version: &str) -> Result<bool, String> {
                 }
             }
 
-            let mut outfile = File::create(&out_path)
-                .map_err(|e| format!("Failed to create the file: {}", e))?;
+            let mut outfile =
+                File::create(&out_path).map_err(|e| format!("Failed to create the file: {}", e))?;
 
-            copy(
-                &mut entry,
-                &mut outfile,
-            ).map_err(|e| format!("Failed to write the file: {}", e))?;
+            copy(&mut entry, &mut outfile)
+                .map_err(|e| format!("Failed to write the file: {}", e))?;
 
             println!("successfully extracted: {:?}", out_path);
         }
@@ -396,19 +400,24 @@ async fn install_client(version: &str) -> Result<bool, String> {
     println!("installation size: {} bytes", size);
 
     let mut data = load_versions_data();
-    let stats = data.versions.entry(version.to_string()).or_insert(VersionStats {
-        total_play_time: 0,
-        last_played: 0,
-        is_running: false,
-        start_time: None,
-        size_bytes: size,
-    });
+    let stats = data
+        .versions
+        .entry(version.to_string())
+        .or_insert(VersionStats {
+            total_play_time: 0,
+            last_played: 0,
+            is_running: false,
+            start_time: None,
+            size_bytes: size,
+        });
     stats.size_bytes = size;
     save_versions_data(&data);
 
     println!("updated version stats");
 
-    let _ = fs::remove_file(dest_zip);
+    if let Err(e) = fs::remove_file(dest_zip) {
+        println!("Warning: failed to remove temporary zip file: {}", e);
+    }
     println!("cleaned up zip file");
 
     let is_installed = utils::client::is_client_installed(version);
@@ -435,7 +444,7 @@ fn setup_hosts_file() -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::ffi::OsStrExt;
-        use winapi::um::{ shellapi::ShellExecuteW, winuser::SW_HIDE };
+        use winapi::um::{shellapi::ShellExecuteW, winuser::SW_HIDE};
 
         let hosts_path = match std::env::consts::OS {
             "windows" => r"C:\Windows\System32\drivers\etc\hosts",
@@ -446,14 +455,23 @@ fn setup_hosts_file() -> Result<String, String> {
             return Err(format!("Hosts file not found at {}", hosts_path));
         }
 
-        let mut file = std::fs::OpenOptions::new()
-            .read(true)
-            .open(hosts_path)
-            .map_err(|e| format!("Failed to open hosts file: {}", e))?;
+        let mut file = match std::fs::OpenOptions::new().read(true).open(hosts_path) {
+            Ok(file) => file,
+            Err(e) => return match e.kind() {
+                std::io::ErrorKind::PermissionDenied => Err(
+                    "Permission denied while opening the hosts file. Please run Fluster as administrator once."
+                        .to_string(),
+                ),
+                std::io::ErrorKind::NotFound => {
+                    Err(format!("Hosts file not found at {}", hosts_path))
+                }
+                _ => Err(format!("Failed to open hosts file: {}", e)),
+            },
+        };
 
         if file.metadata().is_ok() {
             let mut contents = String::new();
-            
+
             file.read_to_string(&mut contents)
                 .map_err(|e| format!("Failed to read hosts file: {}", e))?;
 
@@ -490,15 +508,12 @@ fn setup_hosts_file() -> Result<String, String> {
     }
     #[cfg(not(target_os = "windows"))]
     {
-        match write_hosts_file() {
-            Ok(message) => Ok(message),
-            Err(e) => Err(e),
-        }
+        write_hosts_file()
     }
 }
 
 #[tauri::command]
-fn uninstall_client(version: &str) -> Result<String, String> {    
+fn uninstall_client(version: &str) -> Result<String, String> {
     let versions = match utils::appdata::return_versions() {
         Ok(path) => path,
         Err(e) => return Err(format!("Failed to get the versions directory: {}", e)),
@@ -517,8 +532,7 @@ fn uninstall_client(version: &str) -> Result<String, String> {
 }
 
 fn get_versions_file_path() -> std::path::PathBuf {
-    let mut path = utils::appdata::return_versions()
-        .expect("Failed to get versions directory");
+    let mut path = utils::appdata::return_versions().expect("Failed to get versions directory");
     path.push("version_stats.json");
     path
 }
@@ -560,21 +574,25 @@ fn get_version_stats(version: &str) -> Result<String, String> {
             is_running: false,
             start_time: None,
             size_bytes: 0,
-        }).unwrap_or_default()),
+        })
+        .unwrap_or_default()),
     }
 }
 
 fn update_version_stats(version: &str, started: bool) {
     let mut data = load_versions_data();
     let current_time = get_current_timestamp();
-    
-    let stats = data.versions.entry(version.to_string()).or_insert(VersionStats {
-        total_play_time: 0,
-        last_played: current_time,
-        is_running: false,
-        start_time: None,
-        size_bytes: 0,
-    });
+
+    let stats = data
+        .versions
+        .entry(version.to_string())
+        .or_insert(VersionStats {
+            total_play_time: 0,
+            last_played: current_time,
+            is_running: false,
+            start_time: None,
+            size_bytes: 0,
+        });
 
     if started {
         stats.is_running = true;
@@ -596,14 +614,11 @@ fn format_size(size: u64) -> String {
     const MB: u64 = KB * 1024;
     const GB: u64 = MB * 1024;
 
-    if size >= GB {
-        format!("{:.2} GB", size as f64 / GB as f64)
-    } else if size >= MB {
-        format!("{:.2} MB", size as f64 / MB as f64)
-    } else if size >= KB {
-        format!("{:.2} KB", size as f64 / KB as f64)
-    } else {
-        format!("{} B", size)
+    match size {
+        size if size >= GB => format!("{:.2} GB", size as f64 / GB as f64),
+        size if size >= MB => format!("{:.2} MB", size as f64 / MB as f64),
+        size if size >= KB => format!("{:.2} KB", size as f64 / KB as f64),
+        _ => format!("{} B", size),
     }
 }
 
@@ -617,7 +632,7 @@ fn calculate_dir_size(path: &Path) -> std::io::Result<u64> {
     for entry in fs::read_dir(path)? {
         let entry = entry?;
         let path = entry.path();
-        
+
         if path.is_file() {
             total_size += fs::metadata(&path)?.len();
         } else if path.is_dir() {
@@ -637,14 +652,14 @@ fn get_version_size(version: &str) -> Result<String, String> {
             let versions = utils::appdata::return_versions()
                 .map_err(|e| format!("Failed to get versions directory: {}", e))?;
             let version_path = versions.join(version);
-            
+
             if !version_path.exists() {
                 return Ok("0 B".to_string());
             }
-            
+
             let size = calculate_dir_size(&version_path)
                 .map_err(|e| format!("Failed to calculate size: {}", e))?;
-                
+
             Ok(format_size(size))
         }
     }
@@ -668,19 +683,35 @@ pub fn run() {
             .merge(("shutdown.timeout", 0))
             .merge(("workers", 1));
 
-        let rocket = rocket::custom(config)
-            .mount("/", rocket::routes![
-                ide::toolbox, ide::start, ide::upload, ide::save, ide::abuse_report, ide::help, ide::error_report_dialog,
-                game::gameserver, game::machine_configuration, game::keep_alive_pinger, game::visit, game::join,
-                asset::legacy, asset::v1, asset::v2,
+        let rocket = rocket::custom(config).mount(
+            "/",
+            rocket::routes![
+                ide::toolbox,
+                ide::start,
+                ide::upload,
+                ide::save,
+                ide::abuse_report,
+                ide::help,
+                ide::error_report_dialog,
+                game::gameserver,
+                game::machine_configuration,
+                game::keep_alive_pinger,
+                game::visit,
+                game::join,
+                asset::legacy,
+                asset::v1,
+                asset::v2,
                 r#static::embedded,
-            ]);
+            ],
+        );
 
         match rocket.ignite().await {
             Ok(rocket) => {
                 if let Err(e) = rocket.launch().await {
                     eprintln!("HTTP server error: {}", e);
-                    if e.to_string().contains("address already in use") || e.to_string().contains("permission denied") {
+                    if e.to_string().contains("address already in use")
+                        || e.to_string().contains("permission denied")
+                    {
                         eprintln!("Port 80 is either in use or requires admin privileges.");
                         eprintln!("Please ensure no other web server is running on port 80");
                         eprintln!("On Unix systems, try running with sudo");
@@ -691,7 +722,9 @@ pub fn run() {
             }
             Err(e) => {
                 eprintln!("Failed to start HTTP server: {}", e);
-                if e.to_string().contains("address already in use") || e.to_string().contains("permission denied") {
+                if e.to_string().contains("address already in use")
+                    || e.to_string().contains("permission denied")
+                {
                     eprintln!("Port 80 is either in use or requires admin privileges.");
                     eprintln!("Please ensure no other web server is running on port 80");
                     eprintln!("On Unix systems, try running with sudo");
